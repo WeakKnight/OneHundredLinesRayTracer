@@ -1,7 +1,12 @@
-#![feature(const_fn)]
+extern crate rand;
 
+use rand::prelude::*;
 use std::f32;
 use std::ops;
+use std::io::{BufWriter, Write};
+use std::fs::File;
+use std::path::Path;
+
 #[derive(Copy, Clone)]
 struct Vector3 {
     x: f32,
@@ -9,7 +14,7 @@ struct Vector3 {
     z: f32,
 }
 impl Vector3 {
-    const fn new(x: f32, y: f32, z: f32) -> Vector3 {
+    fn new(x: f32, y: f32, z: f32) -> Vector3 {
         Vector3 { x: x, y: y, z: z }
     }
     fn normalize(self) -> Self {
@@ -91,7 +96,7 @@ struct Sphere {
     reflection_type: ReflectionType,
 }
 impl Sphere {
-    const fn new(
+    fn new(
         radius: f32,
         position: Vector3,
         emission: Vector3,
@@ -138,7 +143,7 @@ impl Scene {
 
     fn intersect(&self, _ray: &Ray, _t: &mut f32, _id: &mut usize) -> bool {
         let count = self.objects.len();
-        let mut distance: f32 = 0.0;
+        let mut distance: f32;
         *_t = f32::INFINITY;
         for i in count - 1..0 {
             let object = &self.objects[i];
@@ -253,9 +258,33 @@ fn main() {
         width as f32 * 0.5135 / height as f32,
     );
     let cy = cx.cross(camera_ray.direction).normalize() * 0.5135;
-    let result = Vector3::new(0.0, 0.0, 0.0);
-    let context = vec![Vector3::new(0.0, 0.0, 0.0); width * height];
+    let mut result = Vector3::new(0.0, 0.0, 0.0);
+    let mut context = vec![Vector3::new(0.0, 0.0, 0.0); width * height];
+    let mut rng = thread_rng();
     for y in 0..height - 1 {
-        for x in 0..width - 1 {}
+        for x in 0..width - 1 {
+            let i = (height - y - 1) * width + x;
+            for sy in 0..1 {
+                for sx in 0..1 {
+                    result = Vector3::new(0.0, 0.0, 0.0);
+                    for _ in 0..samps - 1 {
+                        let mut dx: f32 = rng.gen_range::<f32>(-1.0, 1.0);
+                        let mut dy: f32 = rng.gen_range::<f32>(-1.0, 1.0);
+                        let d: Vector3 = cx
+                            * (((sx as f32 + 0.5 + dx) * 0.5 + x as f32) / width as f32 - 0.5)
+                            + cy * (((sy as f32 + 0.5 + dy) * 0.5 + y as f32) / height as f32 - 0.5) + camera_ray.direction;
+                        result = result + scene.shade(&Ray::new(camera_ray.origin + d * 140.0, d.normalize()), 0)*(1.0/(samps as f32));
+                    }
+                    context[i] = context[i] + Vector3::new(clamp(result.x), clamp(result.y), clamp(result.z));
+                }
+            }
+        }
+    }
+    let path = Path::new("result.ppm");
+    let file = File::create(path);
+    let mut buffer_writter = BufWriter::new(file.unwrap());
+    buffer_writter.write(format!("P3\n{} {}\n{}\n",width,height,255).as_bytes()).unwrap();
+    for i in 0..context.len() - 1{
+        buffer_writter.write(format!("{} {} {} ", to_int(context[i].x), to_int(context[i].y), to_int(context[i].z)).as_bytes()).unwrap();
     }
 }

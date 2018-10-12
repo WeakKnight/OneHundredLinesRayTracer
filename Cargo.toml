@@ -1,6 +1,7 @@
 [package]
-name = "OneHundredLinesRayTracer"
+name = "one_hundred_lines_ray_tracer"
 version = "0.1.0"
 authors = ["Knight <790184126@qq.com>"]
 
 [dependencies]
+rand = "0.5"
